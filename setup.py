@@ -23,13 +23,15 @@ OPTIONS = {
     },
     'packages': [
         'rumps',
-        'pyobjc',
+        'objc',
         'pyaudio',
         'numpy',
         'torch',
         'whisper',
         'soundfile',
     ],
+    'includes': ['AppKit', 'Foundation', 'Quartz'],
+    'frameworks': ['CoreFoundation', 'ApplicationServices'],
     'excludes': [
         'matplotlib',
         'tkinter',

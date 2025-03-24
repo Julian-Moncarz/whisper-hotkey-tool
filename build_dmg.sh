@@ -17,11 +17,17 @@ VOL_NAME="${APP_NAME} ${VERSION}"
 
 # Step 1: Clean up previous builds
 echo "Cleaning up previous builds..."
-rm -rf "${BUILD_DIR}" "${DIST_DIR}" "${DMG_NAME}"
+rm -rf "${BUILD_DIR}" "${DIST_DIR}" "${DMG_NAME}" 
+# Remove egg-info directories if they exist (suppressing errors if they don't)
+find . -name "*.egg-info" -type d -exec rm -rf {} +  2>/dev/null || true
+find . -name "__pycache__" -type d -exec rm -rf {} +  2>/dev/null || true
 
 # Step 2: Build the app using py2app
 echo "Building the application using py2app..."
-python setup.py py2app
+# Try rebuilding the egg-info directory first
+python setup.py egg_info
+# Then build the app
+python setup.py py2app --no-strip
 
 # Make sure the app was built
 if [ ! -d "${APP_PATH}" ]; then
