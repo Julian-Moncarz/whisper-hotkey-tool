@@ -137,19 +137,29 @@ class WhisperHotkeyApp(rumps.App):
     @rumps.clicked("Whisper Model")
     def select_model(self, sender) -> None:
         """Select a Whisper model."""
-        # Find which model was selected
-        for model_name, item in self.model_items.items():
-            if sender == item:
-                # Change the model
-                self.app_core.change_whisper_model(model_name)
-                
-                # Update the menu checkmarks
-                for other_item in self.model_items.values():
-                    other_item.state = other_item == sender
-                
-                # Update the status
-                self.status_item.title = f"Status: Loading {model_name} model..."
+        # Find which model was selected based on the menu item title
+        selected_model = None
+        for model_name, size in self.app_core.get_available_models().items():
+            expected_title = f"{model_name.capitalize()} ({size})"
+            if sender.title == expected_title:
+                selected_model = model_name
                 break
+        
+        # If we found a matching model, update it
+        if selected_model:
+            # Update the status to show we're loading
+            self.status_item.title = f"Status: Loading {selected_model} model..."
+            
+            # Change the model
+            self.app_core.change_whisper_model(selected_model)
+            
+            # Update the menu checkmarks - first clear all
+            for item in self.model_items.values():
+                item.state = False
+            
+            # Then set the current one
+            if selected_model in self.model_items:
+                self.model_items[selected_model].state = True
     
     @rumps.clicked("Delete Recordings After Use")
     def toggle_delete_recordings(self, sender) -> None:

@@ -36,6 +36,7 @@ class HotkeyManager:
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.monitor = None
+        self.run_loop = None
     
     def register_hotkey(self, hotkey_str: str, callback: Callable) -> bool:
         """
@@ -102,25 +103,13 @@ class HotkeyManager:
             NSEvent.removeMonitor_(self.monitor)
             self.monitor = None
         
-        # Signal the event loop to stop
+        # If we have a reference to the run loop, stop it
+        if hasattr(self, 'run_loop') and self.run_loop:
+            from Foundation import CFRunLoopStop
+            CFRunLoopStop(self.run_loop)
+        
+        # Wait for the thread to terminate
         if self.thread:
-            # Post an application-defined event to wake up the run loop
-            app = NSApplication.sharedApplication()
-            if app:
-                event = NSEvent.otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2_(
-                    NSApplicationDefined,
-                    (0, 0),
-                    0,
-                    0,
-                    0,
-                    None,
-                    0,
-                    0,
-                    0
-                )
-                app.postEvent_atStart_(event, True)
-            
-            # Wait for the thread to terminate
             self.thread.join(timeout=1.0)
             self.thread = None
     
@@ -157,17 +146,26 @@ class HotkeyManager:
     def _event_loop(self) -> None:
         """Event loop for handling hotkey events."""
         try:
+            # Import necessary Foundation components
+            from Foundation import (
+                CFRunLoopGetCurrent,
+                CFRunLoopRunInMode,
+                kCFRunLoopDefaultMode
+            )
+            
             # Set up event monitoring for key down events
             self.monitor = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
                 NSKeyDownMask,
                 self._handle_event
             )
             
-            # Keep the thread alive until stop() is called
+            # Store the run loop reference so we can stop it
+            self.run_loop = CFRunLoopGetCurrent()
+            
+            # Run the loop until signaled to stop
             while self.running:
-                # Process events using the main run loop
-                NSApp = NSApplication.sharedApplication()
-                NSApp.run()
+                # Process events for a short time (0.1 seconds), then check if we should continue
+                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, True)
                 
         except Exception as e:
             print(f"Error in event loop: {e}")
