@@ -1,0 +1,21 @@
+# Core application dependencies
+PyObjC>=8.5         # For macOS APIs
+pyobjc-framework-Cocoa>=8.5  # Cocoa framework bindings
+pyobjc-framework-Carbon>=8.5  # Carbon framework for hotkeys
+pyobjc-framework-Quartz>=8.5  # For accessibility features
+rumps>=0.3.0        # Menu bar app framework
+
+# Audio processing
+pyaudio>=0.2.13     # For audio recording
+numpy>=1.20.0       # Required for audio processing
+soundfile>=0.10.3   # For saving audio files
+
+# Whisper model dependencies
+torch>=1.10.0,<2.0.0  # PyTorch for Whisper
+openai-whisper>=20230314  # OpenAI Whisper
+
+# Packaging
+py2app>=0.28.0      # For bundling Python app into macOS app
+
+# Testing
+pytest>=7.0.0       # For running tests
