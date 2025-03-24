@@ -39,8 +39,6 @@ Icon
 *.mp3
 *.aiff
 recordings/
-models/
-
 # IDE
 .idea/
 .vscode/
