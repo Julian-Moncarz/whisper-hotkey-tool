@@ -91,7 +91,7 @@ class WhisperHotkeyApp(rumps.App):
             
             # Create model selection menu items
             available_models = self.app_core.get_available_models()
-            current_model = self.app_core.get_current_model() or "base"
+            current_model = self.app_core.config_manager.get("whisper_model", "base")
             
             for model_name, model_size in available_models.items():
                 item = rumps.MenuItem(

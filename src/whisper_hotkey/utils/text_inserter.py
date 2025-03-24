@@ -64,7 +64,7 @@ class MacOSPlatform:
             
         try:
             pasteboard = self.cocoa.NSPasteboard.generalPasteboard()
-            return pasteboard.string()
+            return pasteboard.stringForType_(self.cocoa.NSPasteboardTypeString)
         except Exception as e:
             print(f"Error getting clipboard text: {e}")
             return None
