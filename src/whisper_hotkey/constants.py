@@ -9,7 +9,6 @@ import pathlib
 APP_NAME = "Whisper Hotkey"
 APP_VERSION = "0.1.0"
 APP_AUTHOR = "User"  # Replace with your name
-APP_ID = "com.user.whisperhotkey"  # Replace with your bundle identifier
 
 # Default configuration
 DEFAULT_START_RECORDING_HOTKEY = "Control-R"

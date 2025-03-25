@@ -14,8 +14,5 @@ soundfile>=0.10.3   # For saving audio files
 torch>=1.10.0,<2.0.0  # PyTorch for Whisper
 openai-whisper>=20230314  # OpenAI Whisper
 
-# Packaging
-py2app>=0.28.0      # For bundling Python app into macOS app
-
 # Testing
 pytest>=7.0.0       # For running tests
