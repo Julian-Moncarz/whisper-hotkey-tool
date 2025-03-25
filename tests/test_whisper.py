@@ -36,7 +36,9 @@ class MockWhisperModel:
         self.compute_type = compute_type
         self.download_root = download_root
         
-    def transcribe(self, audio_file, beam_size=5, vad_filter=True, vad_parameters=None):
+    def transcribe(self, audio_file, beam_size=5, vad_filter=True, vad_parameters=None, initial_prompt=None):
+        # Store the initial_prompt for test verification if needed
+        self.last_initial_prompt = initial_prompt
         return mock_segments, mock_info
 
 # Mock AudioSegment for testing
@@ -44,6 +46,10 @@ class MockAudioSegment:
     def __init__(self, raw_data=b"test_data", frame_rate=44100):
         self.raw_data = raw_data
         self.frame_rate = frame_rate
+        self._length = 2000  # 2 seconds in milliseconds
+    
+    def __len__(self):
+        return self._length
     
     @staticmethod
     def from_file(file_path):
@@ -52,7 +58,10 @@ class MockAudioSegment:
         return MockAudioSegment()
     
     def _spawn(self, raw_data, overrides=None):
-        return MockAudioSegment(raw_data, overrides.get("frame_rate", self.frame_rate))
+        mock = MockAudioSegment(raw_data, overrides.get("frame_rate", self.frame_rate))
+        # Make the sped up audio shorter to simulate speed up
+        mock._length = int(self._length / (overrides.get("frame_rate", self.frame_rate) / self.frame_rate))
+        return mock
     
     def export(self, out_file, format="wav"):
         with open(out_file, "wb") as f:
@@ -66,7 +75,8 @@ class TestWhisperTranscriber(unittest.TestCase):
     def setUp(self):
         """Set up the test environment."""
         # Create a config manager with test settings
-        self.config_manager = ConfigManager()
+        self.config_manager = MagicMock()
+        self.config_manager.get.return_value = ""
         
         # Create the transcriber
         self.transcriber = WhisperTranscriber(self.config_manager)
@@ -78,6 +88,10 @@ class TestWhisperTranscriber(unittest.TestCase):
         
         # Reset mock
         mock_model.reset_mock()
+        
+        # Set up mock segments for transcription tests
+        global mock_segments
+        mock_segments = [MagicMock(text="This is a test transcription")]
     
     def tearDown(self):
         """Clean up after tests."""
@@ -133,10 +147,37 @@ class TestWhisperTranscriber(unittest.TestCase):
         # Load model first
         self.transcriber.load_model("base")
         
-        # Test transcription with speed-up
-        result = self.transcriber.transcribe(self.test_audio_file, speed_factor=1.5)
-        self.assertIn("text", result)
-        self.assertEqual(result["text"], "This is a test transcription")
+        # Wait for loading to complete
+        start_time = time.time()
+        while self.transcriber.is_loading and time.time() - start_time < 5:
+            time.sleep(0.1)
+        
+        # Mock the model's transcribe method to ensure it returns our expected result
+        self.transcriber.model.last_initial_prompt = None  # Reset this value
+        
+        # Create a proper mock for the result
+        mock_result = {
+            "text": "This is a test transcription",
+            "duration": 2.5,
+            "elapsed": 0.5
+        }
+        
+        # Test transcription with speed-up (monkeypatch the returned result)
+        with patch.object(self.transcriber, 'model') as mock_model:
+            # Set up the mock return value
+            mock_segments = [MagicMock(text="This is a test transcription")]
+            mock_info = MagicMock(duration=2.5)
+            mock_model.transcribe.return_value = (mock_segments, mock_info)
+            
+            # Call the transcribe method
+            result = self.transcriber.transcribe(self.test_audio_file, speed_factor=1.5)
+            
+            # Verify the result
+            self.assertIn("text", result)
+            self.assertEqual(result["text"], "This is a test transcription")
+            
+            # Verify the model was called with correct parameters
+            mock_model.transcribe.assert_called_once()
         
         # Verify no temporary files are left
         self.assertEqual(len(self.transcriber._temp_files), 0)
@@ -159,6 +200,92 @@ class TestWhisperTranscriber(unittest.TestCase):
         for temp_file in temp_files:
             self.assertFalse(os.path.exists(temp_file))
         self.assertEqual(len(self.transcriber._temp_files), 0)
+    
+    def test_initial_prompt(self):
+        """Test getting and setting the initial prompt."""
+        # Check default value
+        self.assertEqual(self.transcriber.get_initial_prompt(), "")
+        
+        # Set a new prompt
+        test_prompt = "This is a test context for transcription"
+        self.transcriber.set_initial_prompt(test_prompt)
+        
+        # Verify the prompt was set
+        self.assertEqual(self.transcriber.get_initial_prompt(), test_prompt)
+        
+        # Verify it was saved to config
+        self.config_manager.set.assert_called_with("initial_prompt", test_prompt)
+        
+        # Test setting an empty prompt
+        self.transcriber.set_initial_prompt("")
+        self.assertEqual(self.transcriber.get_initial_prompt(), "")
+    
+    def test_transcribe_with_initial_prompt(self):
+        """Test transcription with an initial prompt."""
+        # Test with a non-empty prompt
+        # Set an initial prompt
+        test_prompt = "This is a meeting about software development"
+        self.transcriber.set_initial_prompt(test_prompt)
+        
+        # Load model
+        self.transcriber.load_model("base")
+        
+        # Wait for loading to complete
+        start_time = time.time()
+        while self.transcriber.is_loading and time.time() - start_time < 5:
+            time.sleep(0.1)
+        
+        # Transcribe with the prompt
+        with patch.object(self.transcriber, 'model') as mock_model:
+            # Set up the mock return value
+            mock_segments = [MagicMock(text="This is a test transcription")]
+            mock_info = MagicMock(duration=2.5)
+            mock_model.transcribe.return_value = (mock_segments, mock_info)
+            
+            # Call the transcribe method
+            self.transcriber.transcribe(self.test_audio_file)
+            
+            # Verify the model was called with correct parameters
+            mock_model.transcribe.assert_called_once()
+            call_args = mock_model.transcribe.call_args[1]  # Get keyword arguments
+            self.assertIn("initial_prompt", call_args)
+            self.assertEqual(call_args["initial_prompt"], test_prompt)
+        
+        # Test with an empty prompt
+        self.transcriber.set_initial_prompt("")
+        
+        # Transcribe with empty prompt
+        with patch.object(self.transcriber, 'model') as mock_model:
+            # Set up the mock return value
+            mock_segments = [MagicMock(text="This is a test transcription")]
+            mock_info = MagicMock(duration=2.5)
+            mock_model.transcribe.return_value = (mock_segments, mock_info)
+            
+            # Call the transcribe method
+            self.transcriber.transcribe(self.test_audio_file)
+            
+            # Verify the model was called without initial_prompt
+            mock_model.transcribe.assert_called_once()
+            call_args = mock_model.transcribe.call_args[1]  # Get keyword arguments
+            self.assertNotIn("initial_prompt", call_args)
+            
+        # Test with whitespace-only prompt
+        self.transcriber.set_initial_prompt("   ")
+        
+        # Transcribe with whitespace prompt
+        with patch.object(self.transcriber, 'model') as mock_model:
+            # Set up the mock return value
+            mock_segments = [MagicMock(text="This is a test transcription")]
+            mock_info = MagicMock(duration=2.5)
+            mock_model.transcribe.return_value = (mock_segments, mock_info)
+            
+            # Call the transcribe method
+            self.transcriber.transcribe(self.test_audio_file)
+            
+            # Verify the model was called without initial_prompt
+            mock_model.transcribe.assert_called_once()
+            call_args = mock_model.transcribe.call_args[1]  # Get keyword arguments
+            self.assertNotIn("initial_prompt", call_args)
 
 if __name__ == "__main__":
     unittest.main()

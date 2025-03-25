@@ -162,8 +162,8 @@ class TestAppCore(unittest.TestCase):
         # Call the transcription method directly
         self.app_core._transcribe_audio("/tmp/test_audio.wav")
         
-        # Verify that transcription was called
-        self.mock_transcriber.transcribe.assert_called_once_with("/tmp/test_audio.wav")
+        # Verify that transcription was called with the speed factor
+        self.mock_transcriber.transcribe.assert_called_once_with("/tmp/test_audio.wav", speed_factor=1.5)
         
         # Verify that text insertion was called
         self.mock_text_inserter.insert_text.assert_called_once_with("This is a test transcription")

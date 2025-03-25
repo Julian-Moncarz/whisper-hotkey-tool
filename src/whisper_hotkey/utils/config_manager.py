@@ -10,7 +10,8 @@ from ..constants import (
     CONFIG_FILE,
     DEFAULT_START_RECORDING_HOTKEY,
     DEFAULT_STOP_RECORDING_HOTKEY,
-    DEFAULT_WHISPER_MODEL
+    DEFAULT_WHISPER_MODEL,
+    DEFAULT_INITIAL_PROMPT
 )
 
 class ConfigManager:
@@ -21,6 +22,7 @@ class ConfigManager:
             "start_recording_hotkey": DEFAULT_START_RECORDING_HOTKEY,
             "stop_recording_hotkey": DEFAULT_STOP_RECORDING_HOTKEY,
             "whisper_model": DEFAULT_WHISPER_MODEL,
+            "initial_prompt": DEFAULT_INITIAL_PROMPT,
             "first_run": True
         }
         

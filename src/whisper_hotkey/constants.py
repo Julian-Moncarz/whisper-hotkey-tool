@@ -14,7 +14,8 @@ APP_AUTHOR = "User"  # Replace with your name
 DEFAULT_START_RECORDING_HOTKEY = "Control-R"
 DEFAULT_STOP_RECORDING_HOTKEY = "Control-S"
 DEFAULT_WHISPER_MODEL = "base"  # Options: "tiny", "base", "small", "medium", "large-v2"
-DEFAULT_SPEED_FACTOR = 2.0  # Speed factor for audio processing
+DEFAULT_SPEED_FACTOR = 1.5  # Speed factor for audio processing
+DEFAULT_INITIAL_PROMPT = ""  # Default initial prompt for Whisper transcription
 
 # File paths
 APP_DATA_DIR = os.path.join(

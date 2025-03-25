@@ -75,6 +75,7 @@ Click on the menu bar icon (🎤) to access the following options:
   - **Large-v2** (3GB): Most accurate, optimized version of the large model
 - **Settings**:
   - **Change Hotkeys**: Customize the keyboard shortcuts
+  - **Set Initial Prompt**: Set a context prompt to guide the transcription (e.g., "This is a technical discussion about software development")
 
 ## Performance
 

@@ -6,7 +6,7 @@ import os
 import threading
 from typing import Callable, Dict, Optional
 
-from .constants import DEFAULT_START_RECORDING_HOTKEY, DEFAULT_STOP_RECORDING_HOTKEY
+from .constants import DEFAULT_START_RECORDING_HOTKEY, DEFAULT_STOP_RECORDING_HOTKEY, DEFAULT_SPEED_FACTOR
 from .utils.config_manager import ConfigManager
 from .utils.hotkey_manager import HotkeyManager
 from .utils.audio_recorder import AudioRecorder
@@ -253,8 +253,8 @@ class AppCore:
             audio_file: Path to the audio file to transcribe
         """
         try:
-            # Transcribe the audio
-            result = self.transcriber.transcribe(audio_file)
+            # Transcribe the audio with default speed factor
+            result = self.transcriber.transcribe(audio_file, speed_factor=DEFAULT_SPEED_FACTOR)
             
             if "error" in result:
                 if self.on_error:

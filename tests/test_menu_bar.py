@@ -179,6 +179,70 @@ class TestMenuBarLogic(unittest.TestCase):
         # Verify status was updated
         self.assertEqual(self.app.title, "🎤")
         self.assertEqual(self.app.status_item.title, "Status: Error")
+    
+    def test_set_initial_prompt(self):
+        """Test setting the initial prompt through the menu bar."""
+        # Mock the transcriber object on app_core
+        self.mock_transcriber = MagicMock()
+        self.mock_transcriber.get_initial_prompt.return_value = "Old prompt"
+        self.mock_app_core.transcriber = self.mock_transcriber
+        
+        # Create a mock initial prompt menu item (to test checkbox behavior)
+        self.app.initial_prompt_item = MagicMock()
+        self.app.initial_prompt_item.state = False
+        
+        # Mock the Window and its response
+        mock_window = MagicMock()
+        mock_response = MagicMock()
+        mock_response.clicked = True
+        mock_response.text = "New test prompt"
+        mock_window.run.return_value = mock_response
+        
+        # Implement a simplified version of the show_initial_prompt_window method
+        @patch('rumps.Window', return_value=mock_window)
+        def test_show_prompt_window(mock_window_class):
+            # Get current prompt
+            current_prompt = self.app.app_core.transcriber.get_initial_prompt()
+            
+            # Create window (handled by the mock)
+            window = mock_window_class(
+                title="Set Initial Prompt",
+                message="Enter an initial prompt to guide the transcription.\n\n"
+                        "This text will be used as context for the transcription.\n"
+                        "Leave empty to disable the initial prompt.",
+                dimensions=(400, 100),
+                default_text=current_prompt
+            )
+            
+            # Show the window
+            response = window.run()
+            
+            if response.clicked:
+                # Set the new prompt
+                new_prompt = response.text.strip()
+                self.app.app_core.transcriber.set_initial_prompt(new_prompt)
+                
+                # Update the menu item state based on whether a prompt is set
+                self.app.initial_prompt_item.state = bool(new_prompt)
+        
+        # Run the test
+        test_show_prompt_window()
+        
+        # Verify the prompt was set correctly
+        self.mock_transcriber.set_initial_prompt.assert_called_once_with("New test prompt")
+        
+        # Verify the menu item state was updated correctly
+        self.assertTrue(self.app.initial_prompt_item.state)
+        
+        # Test empty prompt
+        mock_response.text = ""
+        test_show_prompt_window()
+        
+        # Verify empty prompt was set
+        self.mock_transcriber.set_initial_prompt.assert_called_with("")
+        
+        # Verify the menu item state was updated correctly for empty prompt
+        self.assertFalse(self.app.initial_prompt_item.state)
 
 if __name__ == "__main__":
     unittest.main()

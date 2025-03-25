@@ -40,6 +40,9 @@ class WhisperHotkeyApp(rumps.App):
         # Change hotkeys menu item
         self.change_hotkeys_item = rumps.MenuItem("Change Hotkeys...", callback=self.show_hotkey_window)
         
+        # Initial prompt menu item
+        self.initial_prompt_item = rumps.MenuItem("Set Initial Prompt...", callback=self.show_initial_prompt_window)
+        
         # About and Permissions items
         self.about_item = rumps.MenuItem("About", callback=self.show_about)
         self.permissions_item = rumps.MenuItem("Accessibility Permissions...", callback=self.open_accessibility)
@@ -47,15 +50,15 @@ class WhisperHotkeyApp(rumps.App):
         # Add items to the menu
         self.menu = [
             self.status_item,
-            None,  # Separator
-            self.recording_item,
-            None,  # Separator
             self.recording_hotkey_item,
             self.stop_hotkey_item,
+            None,  # Separator
+            self.recording_item,
             None,  # Separator
             self.model_menu,
             None,  # Separator
             self.change_hotkeys_item,
+            self.initial_prompt_item,
             None,  # Separator
             self.about_item,
             self.permissions_item
@@ -100,6 +103,10 @@ class WhisperHotkeyApp(rumps.App):
             
             self.recording_hotkey_item.title = f"Start Recording Hotkey: {start_hotkey}"
             self.stop_hotkey_item.title = f"Stop Recording Hotkey: {stop_hotkey}"
+            
+            # Check if initial prompt is set and update menu item state
+            current_prompt = self.app_core.transcriber.get_initial_prompt()
+            self.initial_prompt_item.state = bool(current_prompt)
             
             # Check for first run
             if self.app_core.is_first_run:
@@ -201,6 +208,47 @@ class WhisperHotkeyApp(rumps.App):
                     title=APP_NAME,
                     subtitle="Error",
                     message=f"Failed to set hotkeys: {e}"
+                )
+    
+    @rumps.clicked("Set Initial Prompt...")
+    def show_initial_prompt_window(self, sender) -> None:
+        """Show window for setting the initial prompt."""
+        # Get current prompt
+        current_prompt = self.app_core.transcriber.get_initial_prompt()
+        
+        # Create a window for setting the initial prompt
+        window = rumps.Window(
+            title="Set Initial Prompt",
+            message="Enter an initial prompt to guide the transcription.\n\n"
+                    "This text will be used as context for the transcription.\n"
+                    "Leave empty to disable the initial prompt.",
+            dimensions=(400, 100),
+            default_text=current_prompt
+        )
+        
+        # Show the window
+        response = window.run()
+        
+        if response.clicked:
+            try:
+                # Set the new prompt
+                new_prompt = response.text.strip()
+                self.app_core.transcriber.set_initial_prompt(new_prompt)
+                
+                # Update the menu item state based on whether a prompt is set
+                self.initial_prompt_item.state = bool(new_prompt)
+                
+                # Show confirmation
+                rumps.notification(
+                    title=APP_NAME,
+                    subtitle="Initial Prompt Updated",
+                    message=f"Initial prompt set to: {new_prompt if new_prompt else 'None'}"
+                )
+            except Exception as e:
+                rumps.notification(
+                    title=APP_NAME,
+                    subtitle="Error",
+                    message=f"Failed to set initial prompt: {e}"
                 )
     
     @rumps.clicked("About")

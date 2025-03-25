@@ -13,7 +13,7 @@ from faster_whisper import WhisperModel
 import torch
 from pydub import AudioSegment
 
-from ..constants import MODELS_DIR, DEFAULT_WHISPER_MODEL, DEFAULT_SPEED_FACTOR
+from ..constants import MODELS_DIR, DEFAULT_WHISPER_MODEL, DEFAULT_SPEED_FACTOR, DEFAULT_INITIAL_PROMPT
 from ..utils.config_manager import ConfigManager
 
 class WhisperTranscriber:
@@ -36,8 +36,12 @@ class WhisperTranscriber:
         self.load_thread: Optional[threading.Thread] = None
         self.on_model_loaded: Optional[Callable] = None
         
-        # Set up logging
-        logging.basicConfig(level=logging.INFO)
+        # Set up logging to console only
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(levelname)s:%(name)s: %(message)s',
+            force=True  # This ensures we override any existing logging configuration
+        )
         self.logger = logging.getLogger(__name__)
         
         # Determine device and compute type
@@ -46,6 +50,9 @@ class WhisperTranscriber:
         
         # Temporary file tracking
         self._temp_files = set()
+        
+        # Get initial prompt from config
+        self.initial_prompt = self.config_manager.get("initial_prompt", DEFAULT_INITIAL_PROMPT)
 
     def _generate_temp_file(self, suffix: str = ".wav") -> str:
         """Generate a temporary file path."""
@@ -66,16 +73,30 @@ class WhisperTranscriber:
         """
         try:
             # Load the audio file
+            self.logger.info(f"Loading audio file for speedup: {audio_file}")
             audio = AudioSegment.from_file(audio_file)
+            original_duration = len(audio) / 1000.0  # Duration in seconds
+            self.logger.info(f"Original audio duration: {original_duration:.3f} seconds")
             
             # Speed up by modifying frame rate
+            original_frame_rate = audio.frame_rate
+            new_frame_rate = int(audio.frame_rate * speed_factor)
+            self.logger.info(f"Speeding up audio - Original frame rate: {original_frame_rate}Hz, New frame rate: {new_frame_rate}Hz")
+            
             faster_audio = audio._spawn(audio.raw_data, overrides={
-                "frame_rate": int(audio.frame_rate * speed_factor)
+                "frame_rate": new_frame_rate
             })
             
             # Export to new temporary file
             output_file = self._generate_temp_file()
+            self.logger.info(f"Exporting sped up audio to: {output_file}")
             faster_audio.export(output_file, format="wav")
+            
+            # Verify the sped up file
+            sped_up_audio = AudioSegment.from_file(output_file)
+            new_duration = len(sped_up_audio) / 1000.0  # Duration in seconds
+            self.logger.info(f"Sped up audio duration: {new_duration:.3f} seconds")
+            self.logger.info(f"Effective speedup factor: {original_duration/new_duration:.2f}x")
             
             return output_file, True
             
@@ -133,6 +154,26 @@ class WhisperTranscriber:
         
         return True
     
+    def set_initial_prompt(self, prompt: str) -> None:
+        """
+        Set the initial prompt for transcription.
+        
+        Args:
+            prompt: The initial prompt text
+        """
+        self.initial_prompt = prompt
+        self.config_manager.set("initial_prompt", prompt)
+        self.logger.info(f"Initial prompt set to: {prompt}")
+
+    def get_initial_prompt(self) -> str:
+        """
+        Get the current initial prompt.
+        
+        Returns:
+            str: The current initial prompt
+        """
+        return self.initial_prompt
+
     def transcribe(self, audio_file: str, speed_factor: Optional[float] = None) -> Dict[str, Union[str, float]]:
         """
         Transcribe the given audio file.
@@ -170,20 +211,32 @@ class WhisperTranscriber:
             
             # Speed up audio if requested
             if speed_factor is not None:
+                self.logger.info(f"Applying speedup factor of {speed_factor}x to audio")
                 processed_audio, success = self._speed_up_audio(audio_file, speed_factor)
                 if not success:
                     self.logger.warning("Failed to speed up audio, using original file")
                     processed_audio = audio_file
+                self.logger.info(f"File being passed to transcriber: {processed_audio}")
             else:
                 processed_audio = audio_file
+                self.logger.info("No speedup requested, using original audio file")
             
-            # Transcribe the audio with VAD
-            segments, info = self.model.transcribe(
-                processed_audio,
-                beam_size=5,
-                vad_filter=True,
-                vad_parameters={"threshold": 0.5, "min_speech_duration_ms": 250, "max_speech_duration_s": 30}
-            )
+            # Prepare transcription parameters
+            transcribe_params = {
+                "beam_size": 5,
+                "vad_filter": True,
+                "vad_parameters": {"threshold": 0.5, "min_speech_duration_ms": 250, "max_speech_duration_s": 30}
+            }
+            
+            # Add initial prompt if set and not empty
+            if self.initial_prompt and len(self.initial_prompt.strip()) > 0:
+                self.logger.info(f"Using initial prompt: {self.initial_prompt}")
+                transcribe_params["initial_prompt"] = self.initial_prompt
+            else:
+                self.logger.info("No initial prompt provided")
+            
+            # Transcribe the audio
+            segments, info = self.model.transcribe(processed_audio, **transcribe_params)
             
             # Combine segments into a single text
             transcribed_text = " ".join([segment.text for segment in segments])
