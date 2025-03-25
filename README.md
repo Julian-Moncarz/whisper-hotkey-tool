@@ -12,9 +12,36 @@ A macOS application that converts speech to text using OpenAI's Whisper model. P
 
 ## Installation
 
-1. Download the latest `.dmg` file from the [Releases](https://github.com/yourusername/whisper-hotkey/releases) page
-2. Open the `.dmg` file and drag the application to your Applications folder
-3. Launch the application
+### Prerequisites
+
+- Python 3.8 or 3.9
+- Homebrew (for installing dependencies)
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Julian-Moncarz/whisper-hotkey-tool.git
+   cd whisper-hotkey-tool
+   ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the application
+   ```bash
+   python -m src.whisper_hotkey.main
+   ```
+
+
 4. On first run, you'll be prompted to grant necessary permissions:
    - **Accessibility permissions**: Required to insert text at the cursor position
    - **Microphone access**: Required to record audio for transcription
@@ -48,48 +75,16 @@ Click on the menu bar icon (🎤) to access the following options:
 - 4GB RAM minimum (8GB+ recommended for medium/large models)
 - 500MB free disk space plus space for the Whisper model
 
-## Building from Source
-
-### Prerequisites
-
-- Python 3.8 or 3.9
-- Homebrew (for installing dependencies)
-
-### Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/whisper-hotkey.git
-   cd whisper-hotkey
-   ```
-
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Run the application in development mode:
-   ```bash
-   python -m src.whisper_hotkey.main
-   ```
-
-5. Build the application:
-   ```bash
-   ./build_dmg.sh
-   ```
-
 ## Testing
 
 Run the test suite:
 ```bash
 python -m unittest discover tests
 ```
+
+The test suite includes:
+- `test_dependencies.py`: Verifies all required dependencies are installed
+- `test_environment.py`: Checks the application's environment setup
 
 ## License
 
@@ -99,4 +94,3 @@ MIT License - See the LICENSE file for details.
 
 - [OpenAI Whisper](https://github.com/openai/whisper) for the speech recognition model
 - [rumps](https://github.com/jaredks/rumps) for the menu bar interface
-- [PyObjC](https://github.com/ronaldoussoren/pyobjc) for macOS integration
