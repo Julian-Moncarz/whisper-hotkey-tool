@@ -37,8 +37,7 @@ class WhisperHotkeyApp(rumps.App):
         self.model_menu = rumps.MenuItem("Whisper Model")
         self.model_items: Dict[str, rumps.MenuItem] = {}
         
-        # Settings submenu
-        self.settings_menu = rumps.MenuItem("Settings")
+        # Change hotkeys menu item
         self.change_hotkeys_item = rumps.MenuItem("Change Hotkeys...", callback=self.show_hotkey_window)
         
         # Help submenu
@@ -57,16 +56,10 @@ class WhisperHotkeyApp(rumps.App):
             None,  # Separator
             self.model_menu,
             None,  # Separator
-            self.settings_menu,
+            self.change_hotkeys_item,
+            None,  # Separator
             self.help_menu
         ]
-        
-        # Add items to settings menu
-        self.settings_menu.add(self.change_hotkeys_item)
-        
-        # Add items to help menu
-        self.help_menu.add(self.about_item)
-        self.help_menu.add(self.permissions_item)
         
         # Set up callbacks
         self.app_core.on_recording_started = self._on_recording_started
