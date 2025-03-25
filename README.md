@@ -9,6 +9,7 @@ A macOS application that converts speech to text using OpenAI's Whisper model. P
 - **Multiple Models**: Choose between different Whisper models (tiny, base, small, medium, large) based on your accuracy needs and hardware capabilities
 - **Clipboard Integration**: Automatically inserts transcribed text at the current cursor position
 - **Menu Bar Interface**: Simple, unobtrusive menu bar application
+- **Memory-Only Processing**: Audio recordings are kept in memory only and never saved to disk for enhanced privacy
 
 ## Installation
 
@@ -41,7 +42,6 @@ A macOS application that converts speech to text using OpenAI's Whisper model. P
    python -m src.whisper_hotkey.main
    ```
 
-
 4. On first run, you'll be prompted to grant necessary permissions:
    - **Accessibility permissions**: Required to insert text at the cursor position
    - **Microphone access**: Required to record audio for transcription
@@ -66,7 +66,6 @@ Click on the menu bar icon (🎤) to access the following options:
   - **Medium** (1.5GB): Very accurate, but requires more resources
   - **Large** (3GB): Most accurate, but slowest and most resource-intensive
 - **Settings**:
-  - **Delete Recordings After Use**: Toggle whether audio recordings are kept
   - **Change Hotkeys**: Customize the keyboard shortcuts
 
 ## System Requirements
@@ -79,12 +78,15 @@ Click on the menu bar icon (🎤) to access the following options:
 
 Run the test suite:
 ```bash
-python -m unittest discover tests
+python -m pytest tests
 ```
 
-The test suite includes:
-- `test_dependencies.py`: Verifies all required dependencies are installed
-- `test_environment.py`: Checks the application's environment setup
+The test suite includes comprehensive tests for:
+- Audio recording and transcription
+- Configuration management
+- Hotkey handling
+- Menu bar interface
+- Text insertion
 
 ## License
 
