@@ -57,6 +57,10 @@ class TestConfigManager(unittest.TestCase):
             constants.DEFAULT_START_RECORDING_HOTKEY
         )
         self.assertEqual(
+            config_manager.get("stop_recording_hotkey"),
+            constants.DEFAULT_STOP_RECORDING_HOTKEY
+        )
+        self.assertEqual(
             config_manager.get("whisper_model"),
             constants.DEFAULT_WHISPER_MODEL
         )

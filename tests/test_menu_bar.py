@@ -43,8 +43,8 @@ class TestMenuBarLogic(unittest.TestCase):
     def _mock_config_get(self, key, default=None):
         """Mock implementation of config_manager.get."""
         config = {
-            "start_recording_hotkey": "Command-Shift-R",
-            "stop_recording_hotkey": "Command-Shift-S",
+            "start_recording_hotkey": "Control-R",
+            "stop_recording_hotkey": "Control-S",
             "delete_recordings": False,
             "whisper_model": "base"
         }

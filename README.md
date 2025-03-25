@@ -49,9 +49,9 @@ A macOS application that converts speech to text using OpenAI's Whisper model. P
 ## Usage
 
 1. Place your cursor where you want the transcribed text to appear
-2. Press the start recording hotkey (default: `Command-Shift-R`)
+2. Press the start recording hotkey (default: `Control-R`)
 3. Speak clearly into your microphone
-4. Press the stop recording hotkey (default: `Command-Shift-S`)
+4. Press the stop recording hotkey (default: `Control-S`)
 5. The transcribed text will appear at your cursor position
 
 ## Configuration

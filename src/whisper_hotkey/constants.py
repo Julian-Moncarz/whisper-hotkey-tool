@@ -12,8 +12,8 @@ APP_AUTHOR = "User"  # Replace with your name
 APP_ID = "com.user.whisperhotkey"  # Replace with your bundle identifier
 
 # Default configuration
-DEFAULT_START_RECORDING_HOTKEY = "Command-Shift-R"
-DEFAULT_STOP_RECORDING_HOTKEY = "Command-Shift-S"
+DEFAULT_START_RECORDING_HOTKEY = "Control-R"
+DEFAULT_STOP_RECORDING_HOTKEY = "Control-S"
 DEFAULT_WHISPER_MODEL = "base"  # Options: "tiny", "base", "small", "medium", "large"
 
 # File paths
