@@ -26,6 +26,11 @@ class TestConfigManager(unittest.TestCase):
         """Set up the test environment."""
         # Create temporary test directory
         os.makedirs(test_app_data_dir, exist_ok=True)
+        
+        # Remove any existing config file
+        if os.path.exists(constants.CONFIG_FILE):
+            os.remove(constants.CONFIG_FILE)
+            
         self.config_manager = ConfigManager()
     
     def tearDown(self):
@@ -40,15 +45,22 @@ class TestConfigManager(unittest.TestCase):
     
     def test_default_config(self):
         """Test that default configuration is loaded correctly."""
+        # Remove any existing config file
+        if os.path.exists(constants.CONFIG_FILE):
+            os.remove(constants.CONFIG_FILE)
+            
+        # Create a new config manager
+        config_manager = ConfigManager()
+        
         self.assertEqual(
-            self.config_manager.get("start_recording_hotkey"),
+            config_manager.get("start_recording_hotkey"),
             constants.DEFAULT_START_RECORDING_HOTKEY
         )
         self.assertEqual(
-            self.config_manager.get("whisper_model"),
+            config_manager.get("whisper_model"),
             constants.DEFAULT_WHISPER_MODEL
         )
-        self.assertTrue(self.config_manager.is_first_run())
+        self.assertTrue(config_manager.is_first_run())
     
     def test_save_and_load_config(self):
         """Test saving and loading configuration."""
@@ -60,7 +72,7 @@ class TestConfigManager(unittest.TestCase):
         # Create new instance which should load from the saved file
         new_config_manager = ConfigManager()
         
-        # Check that the new instance has the updated values
+        # Verify loaded values
         self.assertEqual(new_config_manager.get("start_recording_hotkey"), test_hotkey)
         self.assertEqual(new_config_manager.get("whisper_model"), "medium")
     

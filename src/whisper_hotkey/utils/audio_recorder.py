@@ -84,10 +84,10 @@ class AudioRecorder:
     
     def stop_recording(self) -> Optional[str]:
         """
-        Stop recording audio and save to file.
+        Stop recording audio and return the audio data.
         
         Returns:
-            Optional[str]: Path to the saved audio file, or None if recording failed
+            Optional[str]: Path to a temporary audio file, or None if recording failed
         """
         if not self.recording:
             return None
@@ -107,14 +107,18 @@ class AudioRecorder:
             # Set recording flag
             self.recording = False
             
-            # Save the recording
-            if self.frames and self.current_filename:
+            # Convert frames to numpy array and save to temporary file
+            if self.frames:
                 # Convert frames to numpy array
                 audio_data = np.frombuffer(b''.join(self.frames), dtype=np.int16)
                 
+                # Create a temporary file
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(suffix=f".{AUDIO_FORMAT}", delete=False)
+                
                 # Save as WAV
                 with sf.SoundFile(
-                    self.current_filename,
+                    temp_file.name,
                     'w',
                     SAMPLE_RATE,
                     CHANNELS,
@@ -125,9 +129,9 @@ class AudioRecorder:
                 
                 # Notify listeners
                 if self.on_recording_stopped:
-                    self.on_recording_stopped(self.current_filename)
+                    self.on_recording_stopped(temp_file.name)
                 
-                return self.current_filename
+                return temp_file.name
                 
             return None
             

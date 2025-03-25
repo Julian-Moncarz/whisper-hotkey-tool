@@ -69,7 +69,7 @@ class TestWhisperTranscriber(unittest.TestCase):
             time.sleep(0.1)
         
         # Verify that the model was loaded
-        mock_whisper.load_model.assert_called_once_with("base", download_root=test_models_dir, device=self.transcriber.device)
+        mock_whisper.load_model.assert_called_once_with("base", download_root=constants.MODELS_DIR, device=self.transcriber.device)
         self.assertEqual(self.transcriber.model_name, "base")
         self.assertTrue(model_loaded[0])
     

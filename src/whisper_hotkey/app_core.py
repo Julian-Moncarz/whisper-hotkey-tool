@@ -237,8 +237,8 @@ class AppCore:
     
     def _on_insertion_complete(self) -> None:
         """Internal callback for when text insertion is complete."""
-        # Clean up the audio file if configured to do so
-        if self.config_manager.get("delete_recordings", True) and self.current_audio_file:
+        # Always clean up the temporary audio file
+        if self.current_audio_file:
             try:
                 if os.path.exists(self.current_audio_file):
                     os.remove(self.current_audio_file)

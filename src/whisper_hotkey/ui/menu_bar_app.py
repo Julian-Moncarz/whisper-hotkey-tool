@@ -39,7 +39,6 @@ class WhisperHotkeyApp(rumps.App):
         
         # Settings submenu
         self.settings_menu = rumps.MenuItem("Settings")
-        self.delete_recordings_item = rumps.MenuItem("Delete Recordings After Use", callback=self.toggle_delete_recordings)
         self.change_hotkeys_item = rumps.MenuItem("Change Hotkeys...", callback=self.show_hotkey_window)
         
         # Help submenu
@@ -63,7 +62,6 @@ class WhisperHotkeyApp(rumps.App):
         ]
         
         # Add items to settings menu
-        self.settings_menu.add(self.delete_recordings_item)
         self.settings_menu.add(self.change_hotkeys_item)
         
         # Add items to help menu
@@ -109,10 +107,6 @@ class WhisperHotkeyApp(rumps.App):
             
             self.recording_hotkey_item.title = f"Start Recording Hotkey: {start_hotkey}"
             self.stop_hotkey_item.title = f"Stop Recording Hotkey: {stop_hotkey}"
-            
-            # Set delete recordings checkbox
-            delete_recordings = config_manager.get("delete_recordings", True)
-            self.delete_recordings_item.state = delete_recordings
             
             # Check for first run
             if self.app_core.is_first_run:
@@ -160,12 +154,6 @@ class WhisperHotkeyApp(rumps.App):
             # Then set the current one
             if selected_model in self.model_items:
                 self.model_items[selected_model].state = True
-    
-    @rumps.clicked("Delete Recordings After Use")
-    def toggle_delete_recordings(self, sender) -> None:
-        """Toggle whether to delete recordings after use."""
-        sender.state = not sender.state
-        self.app_core.config_manager.set("delete_recordings", sender.state)
     
     @rumps.clicked("Change Hotkeys...")
     def show_hotkey_window(self, sender) -> None:
