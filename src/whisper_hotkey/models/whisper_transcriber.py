@@ -1,20 +1,21 @@
 # src/whisper_hotkey/models/whisper_transcriber.py
 """
-Handles transcription of audio using OpenAI's Whisper model.
+Handles transcription of audio using Faster Whisper model.
 """
 import os
 import time
 import threading
+import logging
 from typing import Callable, Dict, Optional, Union
 
-import whisper
+from faster_whisper import WhisperModel
 import torch
 
 from ..constants import MODELS_DIR, DEFAULT_WHISPER_MODEL
 from ..utils.config_manager import ConfigManager
 
 class WhisperTranscriber:
-    """Transcribes audio using OpenAI's Whisper model."""
+    """Transcribes audio using Faster Whisper model."""
     
     # Available Whisper models and their approximate sizes
     AVAILABLE_MODELS = {
@@ -22,7 +23,7 @@ class WhisperTranscriber:
         "base": "142M",
         "small": "466M",
         "medium": "1.5G",
-        "large": "3G"
+        "large-v2": "3G"  # Updated to use large-v2
     }
     
     def __init__(self, config_manager: Optional[ConfigManager] = None):
@@ -32,14 +33,21 @@ class WhisperTranscriber:
         self.is_loading = False
         self.load_thread: Optional[threading.Thread] = None
         self.on_model_loaded: Optional[Callable] = None
+        
+        # Set up logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+        
+        # Determine device and compute type
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.compute_type = "float16" if self.device == "cuda" else "int8"
     
     def load_model(self, model_name: Optional[str] = None) -> bool:
         """
         Load a Whisper model.
         
         Args:
-            model_name: Name of the model to load (tiny, base, small, medium, large)
+            model_name: Name of the model to load (tiny, base, small, medium, large-v2)
                       If None, will use the model specified in config
         
         Returns:
@@ -54,7 +62,7 @@ class WhisperTranscriber:
             
         # Validate model name
         if model_name not in self.AVAILABLE_MODELS:
-            print(f"Invalid model name: {model_name}")
+            self.logger.error(f"Invalid model name: {model_name}")
             return False
             
         # If the model is already loaded, check if it's the same
@@ -108,23 +116,28 @@ class WhisperTranscriber:
             # Time the transcription
             start_time = time.time()
             
-            # Transcribe the audio
-            result = self.model.transcribe(audio_file)
+            # Transcribe the audio with VAD
+            segments, info = self.model.transcribe(
+                audio_file,
+                beam_size=5,
+                vad_filter=True,
+                vad_parameters={"threshold": 0.5, "min_speech_duration_ms": 250, "max_speech_duration_s": 30}
+            )
+            
+            # Combine segments into a single text
+            transcribed_text = " ".join([segment.text for segment in segments])
             
             # Calculate elapsed time
             elapsed_time = time.time() - start_time
             
-            # Extract the text
-            transcribed_text = result.get("text", "").strip()
-            
             return {
-                "text": transcribed_text,
-                "duration": result.get("duration", 0),
+                "text": transcribed_text.strip(),
+                "duration": info.duration,
                 "elapsed": elapsed_time
             }
             
         except Exception as e:
-            print(f"Error transcribing audio: {e}")
+            self.logger.error(f"Error transcribing audio: {e}")
             return {"text": "", "error": str(e), "duration": 0, "elapsed": 0}
     
     def is_model_loaded(self) -> bool:
@@ -143,23 +156,28 @@ class WhisperTranscriber:
             model_name: Name of the model to load
         """
         try:
-            print(f"Loading Whisper model: {model_name}")
+            self.logger.info(f"Loading Faster Whisper model: {model_name}")
             
-            # Load the model
-            self.model = whisper.load_model(model_name, download_root=MODELS_DIR, device=self.device)
+            # Load the model with optimal parameters for the device
+            self.model = WhisperModel(
+                model_name,
+                device=self.device,
+                compute_type=self.compute_type,
+                download_root=MODELS_DIR
+            )
             self.model_name = model_name
             
             # Update config
             self.config_manager.set("whisper_model", model_name)
             
-            print(f"Model {model_name} loaded successfully")
+            self.logger.info(f"Model {model_name} loaded successfully")
             
             # Notify listeners
             if self.on_model_loaded:
                 self.on_model_loaded()
                 
         except Exception as e:
-            print(f"Error loading Whisper model: {e}")
+            self.logger.error(f"Error loading Faster Whisper model: {e}")
             self.model = None
             self.model_name = None
             

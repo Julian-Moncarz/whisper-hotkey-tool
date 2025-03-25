@@ -10,9 +10,9 @@ pyaudio>=0.2.13     # For audio recording
 numpy>=1.20.0,<2.0.0  # Required for audio processing
 soundfile>=0.10.3   # For saving audio files
 
-# Whisper model dependencies
-torch>=1.10.0,<2.0.0  # PyTorch for Whisper
-openai-whisper>=20230314  # OpenAI Whisper
+# Faster Whisper model dependencies
+faster-whisper==0.10.0  # Faster Whisper implementation
+ffmpeg-python==0.2.0    # Required for audio processing
 
 # Testing
 pytest>=7.0.0       # For running tests

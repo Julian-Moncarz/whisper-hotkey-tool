@@ -13,7 +13,7 @@ APP_AUTHOR = "User"  # Replace with your name
 # Default configuration
 DEFAULT_START_RECORDING_HOTKEY = "Control-R"
 DEFAULT_STOP_RECORDING_HOTKEY = "Control-S"
-DEFAULT_WHISPER_MODEL = "base"  # Options: "tiny", "base", "small", "medium", "large"
+DEFAULT_WHISPER_MODEL = "base"  # Options: "tiny", "base", "small", "medium", "large-v2"
 
 # File paths
 APP_DATA_DIR = os.path.join(

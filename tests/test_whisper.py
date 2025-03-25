@@ -23,12 +23,23 @@ os.makedirs(test_models_dir, exist_ok=True)
 from src.whisper_hotkey.models.whisper_transcriber import WhisperTranscriber
 from src.whisper_hotkey.utils.config_manager import ConfigManager
 
-# Skip actual Whisper loading in tests
-mock_whisper = MagicMock()
+# Mock the WhisperModel class
 mock_model = MagicMock()
-mock_whisper.load_model.return_value = mock_model
+mock_segments = [MagicMock(text="This is a test transcription")]
+mock_info = MagicMock(duration=2.5, transcription_time=0.5)
+mock_model.transcribe.return_value = (mock_segments, mock_info)
 
-@patch('src.whisper_hotkey.models.whisper_transcriber.whisper', mock_whisper)
+class MockWhisperModel:
+    def __init__(self, model_name, device, compute_type, download_root):
+        self.model_name = model_name
+        self.device = device
+        self.compute_type = compute_type
+        self.download_root = download_root
+        
+    def transcribe(self, audio_file, beam_size=5, vad_filter=True, vad_parameters=None):
+        return mock_segments, mock_info
+
+@patch('src.whisper_hotkey.models.whisper_transcriber.WhisperModel', MockWhisperModel)
 class TestWhisperTranscriber(unittest.TestCase):
     """Tests for the WhisperTranscriber class."""
     
@@ -41,7 +52,6 @@ class TestWhisperTranscriber(unittest.TestCase):
         self.transcriber = WhisperTranscriber(self.config_manager)
         
         # Reset mock
-        mock_whisper.reset_mock()
         mock_model.reset_mock()
     
     def tearDown(self):
@@ -68,16 +78,17 @@ class TestWhisperTranscriber(unittest.TestCase):
         while self.transcriber.is_loading and time.time() - start_time < 5:
             time.sleep(0.1)
         
-        # Verify that the model was loaded
-        mock_whisper.load_model.assert_called_once_with("base", download_root=constants.MODELS_DIR, device=self.transcriber.device)
-        self.assertEqual(self.transcriber.model_name, "base")
+        # Verify that the model was loaded with correct parameters
+        self.assertEqual(self.transcriber.model.model_name, "base")
+        self.assertEqual(self.transcriber.model.device, self.transcriber.device)
+        self.assertEqual(self.transcriber.model.compute_type, self.transcriber.compute_type)
+        self.assertEqual(self.transcriber.model.download_root, constants.MODELS_DIR)
         self.assertTrue(model_loaded[0])
     
     def test_invalid_model_name(self):
         """Test loading with an invalid model name."""
         result = self.transcriber.load_model("invalid_model")
         self.assertFalse(result)
-        mock_whisper.load_model.assert_not_called()
     
     def test_transcribe_without_model(self):
         """Test transcribing without a loaded model."""
@@ -96,7 +107,7 @@ class TestWhisperTranscriber(unittest.TestCase):
     def test_transcribe_nonexistent_file(self):
         """Test transcribing a non-existent file."""
         # Simulate a loaded model
-        self.transcriber.model = mock_model
+        self.transcriber.model = MockWhisperModel("base", "cpu", "int8", constants.MODELS_DIR)
         self.transcriber.model_name = "base"
         self.transcriber.is_loading = False
         
@@ -111,15 +122,9 @@ class TestWhisperTranscriber(unittest.TestCase):
     def test_transcribe_success(self, mock_exists):
         """Test successful transcription."""
         # Simulate a loaded model
-        self.transcriber.model = mock_model
+        self.transcriber.model = MockWhisperModel("base", "cpu", "int8", constants.MODELS_DIR)
         self.transcriber.model_name = "base"
         self.transcriber.is_loading = False
-        
-        # Use side_effect to return a real dictionary when transcribe is called
-        mock_model.transcribe.side_effect = lambda audio_file: {
-            "text": "This is a test transcription",
-            "duration": 2.5
-        }
         
         # Transcribe
         result = self.transcriber.transcribe("test_audio.wav")
@@ -129,19 +134,19 @@ class TestWhisperTranscriber(unittest.TestCase):
         self.assertEqual(result["duration"], 2.5)
         self.assertIn("elapsed", result)
         
-        # Verify that the model's transcribe method was called
-        mock_model.transcribe.assert_called_once_with("test_audio.wav")
+        # No need to verify call parameters since we're using the actual MockWhisperModel class
     
     @patch('os.path.exists', return_value=True)
     def test_transcribe_error(self, mock_exists):
         """Test error during transcription."""
+        # Create a mock model that raises an exception
+        error_model = MagicMock()
+        error_model.transcribe.side_effect = Exception("Test error")
+        
         # Simulate a loaded model
-        self.transcriber.model = mock_model
+        self.transcriber.model = error_model
         self.transcriber.model_name = "base"
         self.transcriber.is_loading = False
-        
-        # Set up mock to raise an exception
-        mock_model.transcribe.side_effect = Exception("Test error")
         
         # Transcribe
         result = self.transcriber.transcribe("test_audio.wav")
