@@ -119,7 +119,14 @@ class TestTextInserter(unittest.TestCase):
         # Verify that the platform methods were called correctly
         self.mock_platform.check_accessibility_permissions.assert_called_once()
         self.mock_platform.get_clipboard_text.assert_called_once()
-        self.mock_platform.set_clipboard_text.assert_called_once()
+        
+        # Verify that set_clipboard_text was called twice (once to set text, once to restore)
+        self.assertEqual(self.mock_platform.set_clipboard_text.call_count, 2)
+        
+        # Verify the arguments of the calls
+        calls = self.mock_platform.set_clipboard_text.call_args_list
+        self.assertEqual(calls[0][0][0], "Test text")
+        self.assertEqual(calls[1][0][0], "Original clipboard")
         
         # Other methods should not be called after the exception
         self.mock_platform.send_keyboard_shortcut.assert_not_called()

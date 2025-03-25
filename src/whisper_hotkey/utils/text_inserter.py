@@ -149,6 +149,7 @@ class TextInserter:
         Args:
             text: Text to insert
         """
+        old_contents = None
         try:
             # Check if platform is available
             if not self.platform.is_available:
@@ -175,10 +176,6 @@ class TextInserter:
             # Wait for paste to complete
             time.sleep(0.2)
             
-            # Restore the original clipboard content
-            if old_contents:
-                self.platform.set_clipboard_text(old_contents)
-            
             # Notify listeners
             if self.on_insertion_complete:
                 self.on_insertion_complete()
@@ -186,4 +183,7 @@ class TextInserter:
         except Exception as e:
             print(f"Error inserting text: {e}")
         finally:
+            # Always restore the original clipboard content
+            if old_contents:
+                self.platform.set_clipboard_text(old_contents)
             self.inserting = False
