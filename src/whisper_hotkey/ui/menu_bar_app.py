@@ -40,8 +40,7 @@ class WhisperHotkeyApp(rumps.App):
         # Change hotkeys menu item
         self.change_hotkeys_item = rumps.MenuItem("Change Hotkeys...", callback=self.show_hotkey_window)
         
-        # Help submenu
-        self.help_menu = rumps.MenuItem("Help")
+        # About and Permissions items
         self.about_item = rumps.MenuItem("About", callback=self.show_about)
         self.permissions_item = rumps.MenuItem("Accessibility Permissions...", callback=self.open_accessibility)
         
@@ -58,7 +57,8 @@ class WhisperHotkeyApp(rumps.App):
             None,  # Separator
             self.change_hotkeys_item,
             None,  # Separator
-            self.help_menu
+            self.about_item,
+            self.permissions_item
         ]
         
         # Set up callbacks
