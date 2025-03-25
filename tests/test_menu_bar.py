@@ -45,7 +45,7 @@ class TestMenuBarLogic(unittest.TestCase):
         config = {
             "start_recording_hotkey": "Command-Shift-R",
             "stop_recording_hotkey": "Command-Shift-S",
-            "delete_recordings": True,
+            "delete_recordings": False,
             "whisper_model": "base"
         }
         return config.get(key, default)

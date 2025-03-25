@@ -21,7 +21,7 @@ class ConfigManager:
             "start_recording_hotkey": DEFAULT_START_RECORDING_HOTKEY,
             "stop_recording_hotkey": DEFAULT_STOP_RECORDING_HOTKEY,
             "whisper_model": DEFAULT_WHISPER_MODEL,
-            "delete_recordings": True,
+            "delete_recordings": False,
             "first_run": True
         }
         
