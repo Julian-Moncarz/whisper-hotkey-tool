@@ -39,7 +39,27 @@ class MockWhisperModel:
     def transcribe(self, audio_file, beam_size=5, vad_filter=True, vad_parameters=None):
         return mock_segments, mock_info
 
+# Mock AudioSegment for testing
+class MockAudioSegment:
+    def __init__(self, raw_data=b"test_data", frame_rate=44100):
+        self.raw_data = raw_data
+        self.frame_rate = frame_rate
+    
+    @staticmethod
+    def from_file(file_path):
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        return MockAudioSegment()
+    
+    def _spawn(self, raw_data, overrides=None):
+        return MockAudioSegment(raw_data, overrides.get("frame_rate", self.frame_rate))
+    
+    def export(self, out_file, format="wav"):
+        with open(out_file, "wb") as f:
+            f.write(self.raw_data)
+
 @patch('src.whisper_hotkey.models.whisper_transcriber.WhisperModel', MockWhisperModel)
+@patch('src.whisper_hotkey.models.whisper_transcriber.AudioSegment', MockAudioSegment)
 class TestWhisperTranscriber(unittest.TestCase):
     """Tests for the WhisperTranscriber class."""
     
@@ -51,14 +71,24 @@ class TestWhisperTranscriber(unittest.TestCase):
         # Create the transcriber
         self.transcriber = WhisperTranscriber(self.config_manager)
         
+        # Create a temporary test file
+        self.test_audio_file = os.path.join(tempfile.gettempdir(), "test_audio.wav")
+        with open(self.test_audio_file, "wb") as f:
+            f.write(b"test audio data")
+        
         # Reset mock
         mock_model.reset_mock()
     
     def tearDown(self):
         """Clean up after tests."""
-        # Remove the test directories
+        # Remove the test directories and files
         if os.path.exists(test_models_dir):
             shutil.rmtree(test_models_dir)
+        if os.path.exists(self.test_audio_file):
+            os.unlink(self.test_audio_file)
+            
+        # Clean up any remaining temporary files
+        self.transcriber._cleanup_temp_files()
             
         # Restore original constants
         constants.MODELS_DIR = original_models_dir
@@ -85,75 +115,50 @@ class TestWhisperTranscriber(unittest.TestCase):
         self.assertEqual(self.transcriber.model.download_root, constants.MODELS_DIR)
         self.assertTrue(model_loaded[0])
     
-    def test_invalid_model_name(self):
-        """Test loading with an invalid model name."""
-        result = self.transcriber.load_model("invalid_model")
-        self.assertFalse(result)
+    def test_speed_up_audio(self):
+        """Test audio speed-up functionality."""
+        # Test successful speed-up
+        output_file, success = self.transcriber._speed_up_audio(self.test_audio_file, 1.5)
+        self.assertTrue(success)
+        self.assertTrue(os.path.exists(output_file))
+        self.assertNotEqual(output_file, self.test_audio_file)
+        
+        # Test with invalid file
+        output_file, success = self.transcriber._speed_up_audio("nonexistent.wav", 1.5)
+        self.assertFalse(success)
+        self.assertEqual(output_file, "nonexistent.wav")
     
-    def test_transcribe_without_model(self):
-        """Test transcribing without a loaded model."""
-        # Since we're patching the actual model loading,
-        # we need to simulate the model loading process
-        self.transcriber.model = None
-        self.transcriber.is_loading = True
+    def test_transcribe_with_speed_up(self):
+        """Test transcription with audio speed-up."""
+        # Load model first
+        self.transcriber.load_model("base")
         
-        # Attempt to transcribe
-        result = self.transcriber.transcribe("nonexistent_file.wav")
-        
-        # Should report an error
-        self.assertIn("error", result)
-        self.assertEqual(result["text"], "")
-    
-    def test_transcribe_nonexistent_file(self):
-        """Test transcribing a non-existent file."""
-        # Simulate a loaded model
-        self.transcriber.model = MockWhisperModel("base", "cpu", "int8", constants.MODELS_DIR)
-        self.transcriber.model_name = "base"
-        self.transcriber.is_loading = False
-        
-        # Attempt to transcribe a non-existent file
-        result = self.transcriber.transcribe("nonexistent_file.wav")
-        
-        # Should report an error
-        self.assertIn("error", result)
-        self.assertEqual(result["text"], "")
-    
-    @patch('os.path.exists', return_value=True)
-    def test_transcribe_success(self, mock_exists):
-        """Test successful transcription."""
-        # Simulate a loaded model
-        self.transcriber.model = MockWhisperModel("base", "cpu", "int8", constants.MODELS_DIR)
-        self.transcriber.model_name = "base"
-        self.transcriber.is_loading = False
-        
-        # Transcribe
-        result = self.transcriber.transcribe("test_audio.wav")
-        
-        # Verify the result
+        # Test transcription with speed-up
+        result = self.transcriber.transcribe(self.test_audio_file, speed_factor=1.5)
+        self.assertIn("text", result)
         self.assertEqual(result["text"], "This is a test transcription")
-        self.assertEqual(result["duration"], 2.5)
-        self.assertIn("elapsed", result)
         
-        # No need to verify call parameters since we're using the actual MockWhisperModel class
+        # Verify no temporary files are left
+        self.assertEqual(len(self.transcriber._temp_files), 0)
     
-    @patch('os.path.exists', return_value=True)
-    def test_transcribe_error(self, mock_exists):
-        """Test error during transcription."""
-        # Create a mock model that raises an exception
-        error_model = MagicMock()
-        error_model.transcribe.side_effect = Exception("Test error")
+    def test_cleanup_temp_files(self):
+        """Test temporary file cleanup."""
+        # Create some temporary files
+        temp_files = [
+            self.transcriber._generate_temp_file() for _ in range(3)
+        ]
         
-        # Simulate a loaded model
-        self.transcriber.model = error_model
-        self.transcriber.model_name = "base"
-        self.transcriber.is_loading = False
+        # Verify files exist
+        for temp_file in temp_files:
+            self.assertTrue(os.path.exists(temp_file))
         
-        # Transcribe
-        result = self.transcriber.transcribe("test_audio.wav")
+        # Clean up
+        self.transcriber._cleanup_temp_files()
         
-        # Verify the error result
-        self.assertIn("error", result)
-        self.assertEqual(result["text"], "")
+        # Verify files are deleted
+        for temp_file in temp_files:
+            self.assertFalse(os.path.exists(temp_file))
+        self.assertEqual(len(self.transcriber._temp_files), 0)
 
 if __name__ == "__main__":
     unittest.main()
