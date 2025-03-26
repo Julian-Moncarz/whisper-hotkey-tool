@@ -37,6 +37,13 @@ class WhisperHotkeyApp(rumps.App):
         self.model_menu = rumps.MenuItem("Whisper Model")
         self.model_items: Dict[str, rumps.MenuItem] = {}
         
+        # Real-time transcription settings
+        self.realtime_menu = rumps.MenuItem("Real-Time Transcription")
+        self.enable_chunking_item = rumps.MenuItem("Enable Real-Time Transcription", callback=self.toggle_chunking)
+        self.set_chunk_duration_item = rumps.MenuItem("Set Chunk Duration...", callback=self.show_chunk_duration_window)
+        self.realtime_menu.add(self.enable_chunking_item)
+        self.realtime_menu.add(self.set_chunk_duration_item)
+        
         # Change hotkeys menu item
         self.change_hotkeys_item = rumps.MenuItem("Change Hotkeys...", callback=self.show_hotkey_window)
         
@@ -57,6 +64,8 @@ class WhisperHotkeyApp(rumps.App):
             None,  # Separator
             self.model_menu,
             None,  # Separator
+            self.realtime_menu,
+            None,  # Separator
             self.change_hotkeys_item,
             self.initial_prompt_item,
             None,  # Separator
@@ -69,6 +78,7 @@ class WhisperHotkeyApp(rumps.App):
         self.app_core.on_recording_stopped = self._on_recording_stopped
         self.app_core.on_transcription_started = self._on_transcription_started
         self.app_core.on_transcription_complete = self._on_transcription_complete
+        self.app_core.on_chunk_transcribed = self._on_chunk_transcribed
         self.app_core.on_error = self._on_error
         
         # Initialize app in background thread
@@ -103,6 +113,11 @@ class WhisperHotkeyApp(rumps.App):
             
             self.recording_hotkey_item.title = f"Start Recording Hotkey: {start_hotkey}"
             self.stop_hotkey_item.title = f"Stop Recording Hotkey: {stop_hotkey}"
+            
+            # Update real-time transcription menu
+            self.enable_chunking_item.state = self.app_core.is_chunking_enabled()
+            chunk_duration = self.app_core.get_chunk_duration()
+            self.set_chunk_duration_item.title = f"Set Chunk Duration ({chunk_duration} sec)..."
             
             # Check if initial prompt is set and update menu item state
             current_prompt = self.app_core.transcriber.get_initial_prompt()
@@ -332,6 +347,82 @@ class WhisperHotkeyApp(rumps.App):
         
         # Open the accessibility permissions panel
         self.open_accessibility(None)
+
+    @rumps.clicked("Enable Real-Time Transcription")
+    def toggle_chunking(self, sender) -> None:
+        """Toggle real-time transcription chunking."""
+        # Toggle the state
+        sender.state = not sender.state
+        
+        # Update the app core
+        self.app_core.set_chunking_enabled(sender.state)
+        
+        # Show notification
+        rumps.notification(
+            title=APP_NAME,
+            subtitle=f"Real-Time Transcription {'Enabled' if sender.state else 'Disabled'}",
+            message=f"Transcription will now happen {'in real-time as you speak' if sender.state else 'after you stop recording'}"
+        )
+    
+    @rumps.clicked("Set Chunk Duration...")
+    def show_chunk_duration_window(self, sender) -> None:
+        """Show window for setting chunk duration."""
+        # Get current chunk duration
+        current_duration = self.app_core.get_chunk_duration()
+        
+        # Create window
+        window = rumps.Window(
+            title="Set Chunk Duration",
+            message="Enter the duration (in seconds) for each transcription chunk.\n\n"
+                    "Shorter chunks (10-30 seconds) provide faster feedback but may be less accurate.\n"
+                    "Longer chunks (60-120 seconds) are more accurate but take longer to process.",
+            dimensions=(400, 100),
+            default_text=str(current_duration)
+        )
+        
+        # Show the window
+        response = window.run()
+        
+        if response.clicked:
+            try:
+                # Parse the input
+                new_duration = int(response.text.strip())
+                
+                # Validate input
+                if new_duration < 10:
+                    raise ValueError("Chunk duration must be at least 10 seconds")
+                if new_duration > 300:
+                    raise ValueError("Chunk duration must be at most 300 seconds")
+                
+                # Update the app core
+                self.app_core.set_chunk_duration(new_duration)
+                
+                # Update the menu item
+                self.set_chunk_duration_item.title = f"Set Chunk Duration ({new_duration} sec)..."
+                
+                # Show confirmation
+                rumps.notification(
+                    title=APP_NAME,
+                    subtitle="Chunk Duration Updated",
+                    message=f"Chunk duration set to {new_duration} seconds"
+                )
+            except ValueError as e:
+                rumps.notification(
+                    title=APP_NAME,
+                    subtitle="Error",
+                    message=f"Invalid chunk duration: {e}"
+                )
+    
+    def _on_chunk_transcribed(self, text: str) -> None:
+        """
+        Called when a chunk transcription is complete.
+        
+        Args:
+            text: The transcribed text
+        """
+        # Update UI
+        self.title = "🎤"
+        self.status_item.title = "Status: Recording (processed chunk)"
 
 def run() -> None:
     """Run the menu bar application."""

@@ -12,6 +12,7 @@ A macOS application that converts speech to text using Faster Whisper. Press a h
 - **Clipboard Integration**: Automatically inserts transcribed text at the current cursor position
 - **Menu Bar Interface**: Simple, unobtrusive menu bar application
 - **Memory-Only Processing**: Audio recordings are kept in memory only and never saved to disk for enhanced privacy
+- **Real-Time Transcription**: Process long recordings in chunks for immediate feedback and better memory management
 
 ## Installation
 
@@ -76,6 +77,10 @@ Click on the menu bar icon (🎤) to access the following options:
 - **Settings**:
   - **Change Hotkeys**: Customize the keyboard shortcuts
   - **Set Initial Prompt**: Set a context prompt to guide the transcription (e.g., "This is a technical discussion about software development")
+  - **Real-Time Transcription**: 
+    - Enable/disable real-time processing of audio chunks
+    - Set chunk duration (default: 30 seconds)
+    - Get immediate feedback as you speak
 
 ## Performance
 

@@ -11,7 +11,9 @@ from ..constants import (
     DEFAULT_START_RECORDING_HOTKEY,
     DEFAULT_STOP_RECORDING_HOTKEY,
     DEFAULT_WHISPER_MODEL,
-    DEFAULT_INITIAL_PROMPT
+    DEFAULT_INITIAL_PROMPT,
+    DEFAULT_CHUNK_DURATION,
+    DEFAULT_CHUNKING_ENABLED
 )
 
 class ConfigManager:
@@ -23,6 +25,8 @@ class ConfigManager:
             "stop_recording_hotkey": DEFAULT_STOP_RECORDING_HOTKEY,
             "whisper_model": DEFAULT_WHISPER_MODEL,
             "initial_prompt": DEFAULT_INITIAL_PROMPT,
+            "chunk_duration": DEFAULT_CHUNK_DURATION,
+            "chunking_enabled": DEFAULT_CHUNKING_ENABLED,
             "first_run": True
         }
         

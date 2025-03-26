@@ -16,6 +16,8 @@ DEFAULT_STOP_RECORDING_HOTKEY = "Control-S"
 DEFAULT_WHISPER_MODEL = "base"  # Options: "tiny", "base", "small", "medium", "large-v2"
 DEFAULT_SPEED_FACTOR = 1.5  # Speed factor for audio processing
 DEFAULT_INITIAL_PROMPT = ""  # Default initial prompt for Whisper transcription
+DEFAULT_CHUNK_DURATION = 30  # Default chunk duration in seconds for real-time transcription
+DEFAULT_CHUNKING_ENABLED = True  # Whether chunking is enabled by default
 
 # File paths
 APP_DATA_DIR = os.path.join(

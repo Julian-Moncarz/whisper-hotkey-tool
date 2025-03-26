@@ -4,9 +4,11 @@ Core application logic for Whisper Hotkey Tool.
 """
 import os
 import threading
-from typing import Callable, Dict, Optional
+import queue
+from typing import Callable, Dict, List, Optional
 
 from .constants import DEFAULT_START_RECORDING_HOTKEY, DEFAULT_STOP_RECORDING_HOTKEY, DEFAULT_SPEED_FACTOR
+from .constants import DEFAULT_CHUNK_DURATION, DEFAULT_CHUNKING_ENABLED
 from .utils.config_manager import ConfigManager
 from .utils.hotkey_manager import HotkeyManager
 from .utils.audio_recorder import AudioRecorder
@@ -30,16 +32,24 @@ class AppCore:
         self.is_first_run = self.config_manager.is_first_run()
         self.current_audio_file: Optional[str] = None
         
+        # Real-time transcription queue and state
+        self.is_processing_chunks = False
+        self.transcription_queue = queue.Queue()
+        self.chunk_files: List[str] = []
+        self.last_prompt_text = ""
+        
         # Set up callbacks
         self.on_recording_started: Optional[Callable] = None
         self.on_recording_stopped: Optional[Callable] = None
         self.on_transcription_started: Optional[Callable] = None
         self.on_transcription_complete: Optional[Callable[[str], None]] = None
+        self.on_chunk_transcribed: Optional[Callable[[str], None]] = None
         self.on_error: Optional[Callable[[str], None]] = None
         
         # Connect internal callbacks
         self.audio_recorder.on_recording_started = self._on_recording_started
         self.audio_recorder.on_recording_stopped = self._on_recording_stopped
+        self.audio_recorder.on_chunk_complete = self._on_chunk_complete
         self.transcriber.on_model_loaded = self._on_model_loaded
         self.text_inserter.on_insertion_complete = self._on_insertion_complete
     
@@ -54,6 +64,12 @@ class AppCore:
             # Start loading the Whisper model
             model_name = self.config_manager.get("whisper_model")
             self.transcriber.load_model(model_name)
+            
+            # Configure audio recorder
+            chunk_duration = self.config_manager.get("chunk_duration", DEFAULT_CHUNK_DURATION)
+            chunking_enabled = self.config_manager.get("chunking_enabled", DEFAULT_CHUNKING_ENABLED)
+            self.audio_recorder.set_chunk_duration(chunk_duration)
+            self.audio_recorder.set_chunking_enabled(chunking_enabled)
             
             # Register hotkeys
             start_hotkey = self.config_manager.get("start_recording_hotkey", DEFAULT_START_RECORDING_HOTKEY)
@@ -86,6 +102,9 @@ class AppCore:
         # Stop the hotkey manager
         self.hotkey_manager.stop()
         
+        # Clean up any temporary chunk files
+        self._cleanup_chunk_files()
+        
         # Save any pending configuration changes
         self.config_manager.save_config()
     
@@ -99,6 +118,18 @@ class AppCore:
         if self.is_recording:
             return False
             
+        # Reset chunk list
+        self._cleanup_chunk_files()
+        self.chunk_files = []
+        self.last_prompt_text = ""
+        
+        # Clear transcription queue
+        while not self.transcription_queue.empty():
+            try:
+                self.transcription_queue.get_nowait()
+            except queue.Empty:
+                break
+        
         # Start the recording
         result = self.audio_recorder.start_recording()
         
@@ -125,18 +156,41 @@ class AppCore:
         # Store the audio file path
         self.current_audio_file = audio_file
         
-        # Start transcription in a background thread
-        self.is_transcribing = True
-        if self.on_transcription_started:
-            self.on_transcription_started()
-            
-        threading.Thread(
-            target=self._transcribe_audio,
-            args=(audio_file,),
-            daemon=True
-        ).start()
+        # The final audio file is processed in chunks if chunking was enabled
+        # If no chunks were processed, we need to start transcription now
+        if not self.chunk_files:
+            # Start transcription in a background thread
+            self.is_transcribing = True
+            if self.on_transcription_started:
+                self.on_transcription_started()
+                
+            threading.Thread(
+                target=self._transcribe_audio,
+                args=(audio_file,),
+                daemon=True
+            ).start()
         
         return True
+    
+    def set_chunking_enabled(self, enabled: bool) -> None:
+        """
+        Enable or disable real-time transcription chunking.
+        
+        Args:
+            enabled: Whether chunking should be enabled
+        """
+        self.audio_recorder.set_chunking_enabled(enabled)
+        self.config_manager.set("chunking_enabled", enabled)
+    
+    def set_chunk_duration(self, duration_seconds: int) -> None:
+        """
+        Set the chunk duration for real-time transcription.
+        
+        Args:
+            duration_seconds: Duration of each chunk in seconds
+        """
+        self.audio_recorder.set_chunk_duration(duration_seconds)
+        self.config_manager.set("chunk_duration", duration_seconds)
     
     def set_hotkeys(self, start_hotkey: str, stop_hotkey: str) -> bool:
         """
@@ -208,13 +262,21 @@ class AppCore:
         """Get a dictionary of available models and their sizes."""
         return WhisperTranscriber.AVAILABLE_MODELS.copy()
     
+    def is_chunking_enabled(self) -> bool:
+        """Check if real-time transcription chunking is enabled."""
+        return self.audio_recorder.chunking_enabled
+    
+    def get_chunk_duration(self) -> int:
+        """Get the current chunk duration in seconds."""
+        return self.audio_recorder.chunk_duration
+    
     def is_currently_recording(self) -> bool:
         """Check if recording is currently in progress."""
         return self.is_recording
     
     def is_currently_transcribing(self) -> bool:
         """Check if transcription is currently in progress."""
-        return self.is_transcribing
+        return self.is_transcribing or self.is_processing_chunks
     
     def _on_recording_started(self) -> None:
         """Internal callback for when recording starts."""
@@ -229,6 +291,114 @@ class AppCore:
         
         if self.on_recording_stopped:
             self.on_recording_stopped()
+    
+    def _on_chunk_complete(self, chunk_file: str) -> None:
+        """
+        Internal callback for when a recording chunk is complete.
+        
+        Args:
+            chunk_file: Path to the chunk audio file
+        """
+        # Add to the list of chunk files
+        self.chunk_files.append(chunk_file)
+        
+        # Add to transcription queue
+        self.transcription_queue.put(chunk_file)
+        
+        # Start processing if not already processing
+        if not self.is_processing_chunks:
+            self._start_chunk_processing()
+    
+    def _start_chunk_processing(self) -> None:
+        """Start background processing of audio chunks."""
+        self.is_processing_chunks = True
+        
+        # Notify listeners that transcription has started
+        if self.on_transcription_started and not self.is_transcribing:
+            self.on_transcription_started()
+        
+        threading.Thread(
+            target=self._process_chunks_thread,
+            daemon=True
+        ).start()
+    
+    def _process_chunks_thread(self) -> None:
+        """Thread function for processing audio chunks for real-time transcription."""
+        try:
+            while not self.transcription_queue.empty() or self.is_recording:
+                try:
+                    # Get the next chunk, waiting up to 1 second
+                    chunk_file = self.transcription_queue.get(timeout=1)
+                except queue.Empty:
+                    # No chunks available yet, but recording is still happening
+                    if self.is_recording:
+                        continue
+                    else:
+                        break
+                
+                try:
+                    # Process this chunk
+                    self._transcribe_chunk(chunk_file)
+                except Exception as e:
+                    if self.on_error:
+                        self.on_error(f"Error transcribing chunk: {e}")
+        
+        finally:
+            self.is_processing_chunks = False
+    
+    def _transcribe_chunk(self, chunk_file: str) -> None:
+        """
+        Transcribe a single audio chunk.
+        
+        Args:
+            chunk_file: Path to the chunk audio file
+        """
+        try:
+            # Use the last transcribed text as initial prompt if available
+            initial_prompt = self.last_prompt_text if self.last_prompt_text else None
+            
+            # Transcribe the chunk
+            result = self.transcriber.transcribe(chunk_file, speed_factor=DEFAULT_SPEED_FACTOR)
+            
+            if "error" in result:
+                if self.on_error:
+                    self.on_error(f"Chunk transcription error: {result['error']}")
+                return
+            
+            transcribed_text = result["text"]
+            
+            # Remember this text for context in the next chunk
+            self.last_prompt_text = transcribed_text
+            
+            # Insert the transcribed text
+            if transcribed_text.strip():
+                if len(self.chunk_files) == 1:  # First chunk
+                    self.text_inserter.insert_text(transcribed_text)
+                else:
+                    self.text_inserter.append_text(transcribed_text)
+                
+                # Notify listeners
+                if self.on_chunk_transcribed:
+                    self.on_chunk_transcribed(transcribed_text)
+        
+        finally:
+            # Clean up the chunk file
+            try:
+                if os.path.exists(chunk_file):
+                    os.remove(chunk_file)
+            except Exception as e:
+                print(f"Error removing chunk file: {e}")
+    
+    def _cleanup_chunk_files(self) -> None:
+        """Clean up any temporary chunk files."""
+        for file_path in self.chunk_files:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing chunk file: {e}")
+        
+        self.chunk_files = []
     
     def _on_model_loaded(self) -> None:
         """Internal callback for when a model is loaded."""

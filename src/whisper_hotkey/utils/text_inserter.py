@@ -142,6 +142,33 @@ class TextInserter:
         
         return True
     
+    def append_text(self, text: str) -> bool:
+        """
+        Append text at the current cursor position, ensuring a newline separates it 
+        from existing content. Used for real-time transcription chunks.
+        
+        Args:
+            text: Text to append
+            
+        Returns:
+            bool: True if append started, False otherwise
+        """
+        if not text or self.inserting:
+            return False
+        
+        # Start insertion in a background thread with newline prefix
+        # Start with a newline to separate from previous content
+        text_with_prefix = "\n" + text
+        
+        self.inserting = True
+        threading.Thread(
+            target=self._insert_text_thread,
+            args=(text_with_prefix,),
+            daemon=True
+        ).start()
+        
+        return True
+    
     def _insert_text_thread(self, text: str) -> None:
         """
         Thread function for inserting text.
